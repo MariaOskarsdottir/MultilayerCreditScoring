@@ -10,18 +10,39 @@ from sklearn.preprocessing import normalize
 #TODO: debug
 import time
 
+class Timer:
 
+    def __init__(self):
+        self.start_time = time.time()
+        self.increment_time = None
+
+    def report_time(self, message = None):
+
+        if message:
+            print(message)
+
+        if not self.increment_time:
+            print("--- {:6.1f} sec. ---".format(time.time() - self.start_time))
+
+        else:
+            print("--- {:6.1f} / {:6.1f} sec. ---".format(time.time() - self.increment_time, time.time() - self.start_time))
+
+        self.increment_time = time.time()
+
+    
 class CreditScoring:
 
     def __init__(self, layer_files, personal_matrix_file, alpha = 0.85):
         """    
         Attributes
         ----------
-        csv_files : list of paths to csv files 
+        layer_files : a list of paths to csv files 
             for layer construciton
         """
         # TODO: debug
         self.start_time = time.time()
+        self.timer = Timer()
+
         # list containing networkX graphs for each layer
         self.layers = []
         
@@ -32,10 +53,9 @@ class CreditScoring:
                 continue
                 #TODO: Or should we throw an exception?       
 
-            self.layers.append(self.create_layer_from_csv(f, self.number_nodes_in_list())) #, ll_dict.keys()))
+            self.layers.append(self.create_layer_from_csv(f, self.number_nodes_in_list()))
 
-        # extract the sets of nodes to be interconnected
-    
+        # extract the sets of nodes to be interconnected    
         self.interconnect_sets = []
     
         for layer in self.layers:
@@ -55,7 +75,7 @@ class CreditScoring:
                 continue
 
             # only the portion below the diagonal of the inter adj matrix is used in multinetX
-            # use it to make the perform better (if not, run at all!)
+            # use it to make the perform better (if not, to run at all!)
             indices.sort(reverse=True)
 
             pos = 0
@@ -69,28 +89,20 @@ class CreditScoring:
 
         self.multilevel_graph = mx.MultilayerGraph(list_of_layers=self.layers, inter_adjacency_matrix=adj_block)
         
-        print('Multilevel graph created')
-        print("--- {:6.1f} sec. ---".format(time.time() - self.start_time))
-        increment_time = time.time()
-        
+        self.timer.report_time('Multilevel graph created')
+
         self.supra_transition_matrix = normalize(mx.adjacency_matrix(self.multilevel_graph), norm='l1', axis=0)
         
-        print('Adj matrix col normalized')
-        print("--- {:6.1f} / {:6.1f} sec. ---".format(time.time() - increment_time, time.time() - self.start_time))
-        increment_time = time.time()
+        self.timer.report_time('Adj matrix col normalized')
         
         # adds self.pers_matrix and self.defaulter_indices to the party
         self.construct_persoal_matrix(personal_matrix_file)
         
-        print('Personal matrix created')
-        print("--- {:6.1f} / {:6.1f} sec. ---".format(time.time() - increment_time, time.time() - self.start_time))
-        increment_time = time.time()
+        self.timer.report_time('Personal matrix created')
 
         self.supra_transition_matrix = alpha * self.supra_transition_matrix + (1 - alpha)/self.pers_matrix.sum() * self.pers_matrix
         
-        print('Supra trans matrix calculated')
-        print("--- {:6.1f} / {:6.1f} sec. ---".format(time.time() - increment_time, time.time() - self.start_time))
-        increment_time = time.time()
+        self.timer.report_time('Supra trans matrix calculated')
         print()
 
         _, leading_eigenvectors = eigs(self.supra_transition_matrix, 1)
@@ -108,8 +120,8 @@ class CreditScoring:
         # adds self.common_nodes_rankings and self.layer_specific_node_rankings to the class namespace
         self.sample_rankings()
 
-        print('Done eig. calcs. and sampling the ranking dictionaries')
-        print("--- {:6.1f} / {:6.1f} sec. ---".format(time.time() - increment_time, time.time() - self.start_time))
+        self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
+
 
 
     def create_layer_from_csv(self, file_path, node_start_id = 0): #TODO... DO WE NEED A FILTERING SET:j code:, filtering_set = None):
