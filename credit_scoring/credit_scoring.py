@@ -40,7 +40,6 @@ class CreditScoring:
             for layer construciton
         """
         # TODO: debug
-        self.start_time = time.time()
         self.timer = Timer()
 
         # list containing networkX graphs for each layer
@@ -88,20 +87,16 @@ class CreditScoring:
                 pos += 1
 
         self.multilevel_graph = mx.MultilayerGraph(list_of_layers=self.layers, inter_adjacency_matrix=adj_block)
-        
         self.timer.report_time('Multilevel graph created')
 
         self.supra_transition_matrix = normalize(mx.adjacency_matrix(self.multilevel_graph), norm='l1', axis=0)
-        
         self.timer.report_time('Adj matrix col normalized')
         
         # adds self.pers_matrix and self.defaulter_indices to the party
         self.construct_persoal_matrix(personal_matrix_file)
-        
         self.timer.report_time('Personal matrix created')
 
         self.supra_transition_matrix = alpha * self.supra_transition_matrix + (1 - alpha)/self.pers_matrix.sum() * self.pers_matrix
-        
         self.timer.report_time('Supra trans matrix calculated')
         print()
 
@@ -112,37 +107,28 @@ class CreditScoring:
 
         self.leading_eigenvector_norm = leading_eigenvector / leading_eigenvector.sum()
 
-        
-        #print('eigenvector: ', self.eigenvector)
-        #print('length: ', len(self.eigenvector))
-        print()
-
         # adds self.common_nodes_rankings and self.layer_specific_node_rankings to the class namespace
         self.sample_rankings()
-
         self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
+        print()
 
 
-
-    def create_layer_from_csv(self, file_path, node_start_id = 0): #TODO... DO WE NEED A FILTERING SET:j code:, filtering_set = None):
+    def create_layer_from_csv(self, file_path, node_start_id = 0):
         """
         Creates a network layer from a csv file
 
-        The first column in the csv file should hold names of nodes to be interconnected between layers
+        The first column in the csv file should hold names of nodes to be interconnected between layers, i.e. common nodes
 
         Attributes
         ----------
+        file_path : str
+            path to file, containing 2 columns, to be used in network layer construction
         node_start_id : int
-            first id to assign to a node created
-        #TODO: samræma...
-        filtering_set : set of ids (strings) 
-            for filtering records to be used from the csv file
+            first id to assign to a node created, defaults to 0
         """
 
         # conversion to int nodes of this graph will eventually be returned from current function
         g = nx.Graph()
-
-        #print('Number of keys in filtering set: {}'.format(len(filtering_set)))
 
         # first pass over the csv file only creates the nodes with the appropriate bipartite attribute
         # bipartite = 0 is used for nodes to be interconnected between layers
@@ -156,41 +142,28 @@ class CreditScoring:
 
                 ext_node_str_id = row[0].strip()
 
-                #if ext_node_str_id in filtering_set: #(not filtering_set) or #TODO activate no filtering if no filtering set is specified
                 externally_connected.append(ext_node_str_id)
                 internally_connected.add(row[1].strip())
-                #else:
-                #    print('Node not found in filtering set...')
 
         g.add_nodes_from(externally_connected, bipartite=0)
         g.add_nodes_from(internally_connected, bipartite=1)
 
 
         # second pass creates a list of edges.
-        # TODO: not sure which is better; reset the csv_reader or just create a new one, taking the latter option
         with open(file_path, encoding='utf8') as f:
             csv_reader = csv.reader(f)
 
             # get the data as list of tuples
-            edges = [(row[0].strip(), row[1].strip()) for row in csv_reader] # TODO: filtering? if not filtering_set or row[0].strip() in filtering_set]
+            edges = [(row[0].strip(), row[1].strip()) for row in csv_reader]
 
         g.add_edges_from(edges)
 
-        # add name to the layer (see if it survives the return statement...)
-        
+        # add name to the layer         
         name = os.path.splitext(os.path.basename(file_path))[0]
         g.name = name
 
-        # haven't still succeeded in triggering this exception, the way I'm assigning the bipartite attribude acc. to columns
-        # in the csv, always creates a new node if trying that.
-        ## TODO: is this needed?
-        #if not bipartite.is_bipartite(G):
-        #    raise Exception('Network is not bipartite')
-
         # abandon labels for ids, here we are using the default value for the ordering parameter
         return nx.convert_node_labels_to_integers(g, first_label=node_start_id, ordering='default', label_attribute='name')
-        # we also have this function
-        # nx.relabel_nodes(takes in the network and a dictionary)
 
 
     def number_nodes_in_list(self):
@@ -231,6 +204,7 @@ class CreditScoring:
         
         defaulters = []
         
+        #TODO: HERE WE HAVE ADOPTED TO THE R FORMAT BUT WE MUST BE MORE GENERAL THAN THAT --> SIMPLE LIST OF DEFAULTERS
         with open(file_name) as f:
             csv_reader = csv.reader(f)
 
@@ -243,7 +217,6 @@ class CreditScoring:
 
         n = self.multilevel_graph.num_nodes
 
-        #self.pers_matrix = lil_matrix((n, n), dtype=np.int8)
         self.pers_matrix = dok_matrix((n, n), dtype=np.int8)
 
         for indexes in self.defaulter_indices:
@@ -251,10 +224,7 @@ class CreditScoring:
             # are there better ways to populate all indexes than gettin all 2 permutations of the doubled lists thrown into a set to remove duplicates
             for i,j in set(permutations(indexes + indexes, 2)):
 
-                # in the docs they talk aboud slowness.... chack if problem
                 self.pers_matrix[i,j] = 1
-
-        #print(self.pers_matrix.size) #the number of nonzeros
 
 
     def print_stats(self):
@@ -276,13 +246,14 @@ class CreditScoring:
             print(padding_2.format('Multi layer name', 'Number of nodes', 'Number of edges'))
             print(padding_2.format(self.multilevel_graph.name, self.multilevel_graph.number_of_nodes(), self.multilevel_graph.number_of_edges()))
 
+        print()
+
     def sample_rankings(self):
 
-        # we are are not consernec about ordering of the nodes in the networks 
+        # we are not concerned about ordering of the nodes in the networks 
         # so we are going to return the results as dictionaries
 
         # first the dict for common nodes
-
         self.common_nodes_rankings = {}
 
         for node_ident, indices in self.interconnections.items():
@@ -294,8 +265,6 @@ class CreditScoring:
                 rank_sum += self.leading_eigenvector_norm[i]
 
             self.common_nodes_rankings[node_ident] = rank_sum
-
-        #print(self.common_nodes_rankings)
 
         print('Length of common nodes ranking dict: ', len(self.common_nodes_rankings))
 
@@ -320,3 +289,5 @@ class CreditScoring:
         for i, d in enumerate(self.layer_specific_node_rankings):
 
             print('Number records in dictionary of specific node rankins for layer {}: {}'.format(i, len(d)))
+
+        print()
