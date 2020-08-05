@@ -18,7 +18,7 @@ pip install git+https://github.com/nkoub/multinetx.git
 
 What is *currently* supported regarding the format of the input data:
 
-> The multilayer network can be built from 2 column csv files, one for each layer. Here the common nodes are arranged in the frist column and the nodes specific to the layer in question are in the latter column. The nodes present in each row of the file form an edge between them in the bipartite network generated.
+> The multilayer network can be built from 2 column csv files, one for each layer. Here the common nodes are arranged in the first column and the nodes specific to the layer in question are in the latter column. The nodes present in each row of the file form an edge between them in the bipartite network generated.
 
 Example csv layer file (layer1.csv):
 
@@ -29,7 +29,7 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-Having a list of paths to such files and a file listing the defaulters for the Personilazation matrix enables us the calculate the rankings like so:
+Having a list of paths to such files and a file listing the defaulters for the Personilazation matrix, enables us to calculate the rankings like so:
 
 ```python
 
@@ -49,7 +49,9 @@ To access the results, query the following parameters of the CreditScoring class
 ```common_nodes_rankings``` gives a dictionary from common node identifiers (as seen the csv layer files) to the aggregated rankings.
 ```layer_specific_node_rankings``` gives a list of dictionaries (one for each layer) for the rankings of the nodes specific to that layer.
 
-REMAINING IN THE IMPLEMENTATION
+
+
+TODO...REMAINING IN THE IMPLEMENTATION
 
 + Network_type, defaUlt is bipartite multilayer but mulitplex can also be specified !?! //TODO: check this further.
 + Measures to ensure the same set of common nodes in each layer... if needed.
