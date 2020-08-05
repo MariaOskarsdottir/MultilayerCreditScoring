@@ -1,8 +1,12 @@
+try:
+    import multinetx as mx
+except ImportError:
+    raise ImportError("multinetx is required - see instructions for setup")
+
 import csv, os
 from itertools import permutations
 import numpy as np
 import networkx as nx
-import multinetx as mx
 from scipy.sparse.linalg import eigs
 from scipy.sparse import lil_matrix, dok_matrix
 from sklearn.preprocessing import normalize
