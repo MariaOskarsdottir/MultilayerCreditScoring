@@ -2,7 +2,7 @@
 
 This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
 
-# installation
+# Installation
 
 ```
 pip install multilayer-credit-scoring
@@ -47,6 +47,7 @@ The `alpha` parameter to the CreditScoring constructor is an optional one and de
 To access the results, query the following parameters of the CreditScoring class instance:
 
 ```common_nodes_rankings``` gives a dictionary from common node identifiers (as seen the csv layer files) to the aggregated rankings.
+
 ```layer_specific_node_rankings``` gives a list of dictionaries (one for each layer) for the rankings of the nodes specific to that layer.
 
 
