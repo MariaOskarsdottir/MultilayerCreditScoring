@@ -35,16 +35,20 @@ Having a list of paths to such files and a file listing the defaulters for the P
 
 from credit_scoring improt CreditScoring
 
-mlcs = CreditScoring(['./layer1.csv', './layer2.csv'], './defaulters.txt', alpha = 0.85)
+mlcs = CreditScoring(['./layer1.csv', './layer2.csv'], './defaulters.txt', alpha = 0.85, csv_delimiter = ',', verbose=True)
 
 mlcs.print_stats()
 
 ```
-The `alpha` parameter to the CreditScoring constructor is an optional one and defaults to the value 0.85. It is used in the personalized pagerank algorithm.
+The `alpha` parameter to the CreditScoring constructor is an optional one and defaults to the value `0.85`. It is used in the personalized pagerank algorithm.
+
+The `verbose` parameter defaults to `False`, if set to `True` some information is printed to the console regarding running times and more.
+
+The `csv_delimiter` abve is shwon in its default value. No need to specify it explicity if not changed.
 
 `print_stats()` prints some counting figures for nodes and links of the networks generated.
 
-To access the results, query the following parameters of the CreditScoring class instance:
+To access the results, query the following members of the CreditScoring class instance:
 
 ```common_nodes_rankings``` gives a dictionary from common node identifiers (as seen the csv layer files) to the aggregated rankings.
 

@@ -11,8 +11,8 @@ from scipy.sparse.linalg import eigs
 from scipy.sparse import lil_matrix, dok_matrix
 from sklearn.preprocessing import normalize
 
-#TODO: debug
 import time
+from pprint import pprint
 
 class Timer:
 
@@ -36,14 +36,16 @@ class Timer:
     
 class CreditScoring:
 
-    def __init__(self, layer_files, personal_matrix_file, alpha = 0.85):
+    def __init__(self, layer_files, personal_matrix_file, alpha = 0.85, csv_delimiter = ',', verbose = False):
         """    
         Attributes
         ----------
         layer_files : a list of paths to csv files 
             for layer construciton
         """
-        # TODO: debug
+        
+        self.verbose = verbose
+        self.csv_delimiter = csv_delimiter
         self.timer = Timer()
 
         # list containing networkX graphs for each layer
@@ -53,8 +55,7 @@ class CreditScoring:
     
             # if other files than csv are present, skip those
             if f[-4:] != '.csv':
-                continue
-                #TODO: Or should we throw an exception?       
+                raise Exception('Input file not of type csv!')       
 
             self.layers.append(self.create_layer_from_csv(f, self.number_nodes_in_list()))
 
@@ -73,36 +74,34 @@ class CreditScoring:
 
         for indices in self.interconnections.values():
         
+            # TODO... WHAT IS THE CORRECT THING TO DO HERE:
             # it might happen that a node to interconnect appears only on one layer
-            if len(indices) == 1:
-                continue
+            #if len(indices) == 1:
+            #    continue
 
             # only the portion below the diagonal of the inter adj matrix is used in multinetX
             # use it to make the perform better (if not, to run at all!)
             indices.sort(reverse=True)
 
-            pos = 0
+            for i,j in permutations(indices, 2):
 
-            # if we have more than 2 layers the we want to process them all
-            while (pos+2) <= len(indices):
+                if i > j:
+                    adj_block[i, j] = 1
 
-                adj_block[indices[pos],indices[pos+1]] = 1
-
-                pos += 1
 
         self.multilevel_graph = mx.MultilayerGraph(list_of_layers=self.layers, inter_adjacency_matrix=adj_block)
-        self.timer.report_time('Multilevel graph created')
+        if self.verbose: self.timer.report_time('Multilevel graph created')
 
-        self.supra_transition_matrix = normalize(mx.adjacency_matrix(self.multilevel_graph), norm='l1', axis=0)
-        self.timer.report_time('Adj matrix col normalized')
+        # column normalized adj matrix
+        self.supra_transition_matrix = normalize(nx.to_scipy_sparse_matrix(self.multilevel_graph, dtype=np.int8), norm='l1', axis=0)
+        if self.verbose: self.timer.report_time('Adj matrix col normalized')
         
         # adds self.pers_matrix and self.defaulter_indices to the party
         self.construct_persoal_matrix(personal_matrix_file)
-        self.timer.report_time('Personal matrix created')
+        if self.verbose: self.timer.report_time('Personal matrix created')
 
         self.supra_transition_matrix = alpha * self.supra_transition_matrix + (1 - alpha)/self.pers_matrix.sum() * self.pers_matrix
-        self.timer.report_time('Supra trans matrix calculated')
-        print()
+        if self.verbose: self.timer.report_time('Supra trans matrix calculated')
 
         _, leading_eigenvectors = eigs(self.supra_transition_matrix, 1)
 
@@ -113,8 +112,7 @@ class CreditScoring:
 
         # adds self.common_nodes_rankings and self.layer_specific_node_rankings to the class namespace
         self.sample_rankings()
-        self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
-        print()
+        if self.verbose: self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
 
 
     def create_layer_from_csv(self, file_path, node_start_id = 0):
@@ -137,7 +135,7 @@ class CreditScoring:
         # first pass over the csv file only creates the nodes with the appropriate bipartite attribute
         # bipartite = 0 is used for nodes to be interconnected between layers
         with open(file_path, encoding='utf8') as f:
-            csv_reader = csv.reader(f)
+            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
 
             externally_connected = [] #what about duplicates, are they to be expected? yes so this is ok I think.
             internally_connected = set()
@@ -155,11 +153,11 @@ class CreditScoring:
 
         # second pass creates a list of edges.
         with open(file_path, encoding='utf8') as f:
-            csv_reader = csv.reader(f)
+            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
 
             # get the data as list of tuples
             edges = [(row[0].strip(), row[1].strip()) for row in csv_reader]
-
+   
         g.add_edges_from(edges)
 
         # add name to the layer         
@@ -210,7 +208,7 @@ class CreditScoring:
         
         #TODO: HERE WE HAVE ADOPTED TO THE R FORMAT BUT WE MUST BE MORE GENERAL THAN THAT --> SIMPLE LIST OF DEFAULTERS
         with open(file_name) as f:
-            csv_reader = csv.reader(f)
+            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
 
             for row in csv_reader:
 
@@ -218,6 +216,9 @@ class CreditScoring:
                     defaulters.append(row[0].strip())
 
         self.defaulter_indices = [index_list for (ident, index_list) in self.interconnections.items() if ident in defaulters]
+
+        #TODO: debug
+        #pprint(self.defaulter_indices)
 
         n = self.multilevel_graph.num_nodes
 
@@ -229,13 +230,20 @@ class CreditScoring:
             for i,j in set(permutations(indexes + indexes, 2)):
 
                 self.pers_matrix[i,j] = 1
+                #TODO: debug
+                #print(i,j)
 
 
     def print_stats(self):
 
-        padding_1 = '{:12} {:^15} {:^15} {:^15} {:^15}'
-        padding_2 = '{:40} {:^15} {:^15}'
+        len_layer_name = [len(x.name) for x in self.layers]
+        
+        len_longest_lname = max(len_layer_name)
 
+        padding_1 = '{:' + str(len_longest_lname) + '} {:^15} {:^15} {:^15} {:^15}'
+        padding_2 = '{:' + str(len(self.multilevel_graph.name)) + '} {:^15} {:^15}'
+
+        print()
         print(padding_1.format('Layer name', 'Total nodes', 'Common nodes', 'Special nodes', 'Number of edges'))
 
         for l in self.layers:
@@ -270,7 +278,9 @@ class CreditScoring:
 
             self.common_nodes_rankings[node_ident] = rank_sum
 
-        print('Length of common nodes ranking dict: ', len(self.common_nodes_rankings))
+        if self.verbose: 
+            print()
+            print('Length of common nodes ranking dict: ', len(self.common_nodes_rankings))
 
         # then we propose a list of dictionaries for the rankings of specific nodes in each layer
         # (not knowing how many they are beforehand)
@@ -287,11 +297,12 @@ class CreditScoring:
                 if d['bipartite'] == 1:
                     layer_ranking_dict[d['name']] = self.leading_eigenvector_norm[n]
 
-
             self.layer_specific_node_rankings.append(layer_ranking_dict)
 
-        for i, d in enumerate(self.layer_specific_node_rankings):
+        if self.verbose:
+            for i, d in enumerate(self.layer_specific_node_rankings):
 
-            print('Number records in dictionary of specific node rankins for layer {}: {}'.format(i, len(d)))
+                print('Number records in dictionary of specific node rankins for layer {}: {}'.format(i, len(d)))
 
-        print()
+            print()
+
