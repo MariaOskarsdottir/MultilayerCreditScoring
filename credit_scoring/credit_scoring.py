@@ -36,12 +36,23 @@ class Timer:
     
 class CreditScoring:
 
-    def __init__(self, layer_files, personal_matrix_file, alpha = 0.85, csv_delimiter = ',', verbose = False):
+    def __init__(self, layer_files, personal_matrix_file, alpha = 0.85, csv_delimiter = ',', check_common_nodes_in_all_layers = True, verbose = False):
         """    
         Attributes
         ----------
         layer_files : a list of paths to csv files 
             for layer construciton
+        personal_matrix_file : path to a text file 
+            listing all the defaulters
+        alpha : ratio 0<alpha<= 1
+            determines the influence of the personal matrix when calculationg the supra transition matrix. Defaults to 0.85
+        csv_delimiter : defaults to , (comma)
+            if other symbol is used it can be set here.
+        check_common_nodes_in_all_layers : boolean defaults to True
+            controls if a test for all common nodes are existing in all layers is included. If this test is run and single common
+            node are missing in a single layer a n exception is raised
+        verbose : boolean defualts to False
+            If set to True some extra information is printed to the console. Mostly concerning running times of the tasks performed. 
         """
         
         self.verbose = verbose
@@ -53,7 +64,7 @@ class CreditScoring:
         
         for f in layer_files:
     
-            # if other files than csv are present, skip those
+            # if other files than csv are present, stop execution and inform user
             if f[-4:] != '.csv':
                 raise Exception('Input file not of type csv!')       
 
@@ -74,10 +85,13 @@ class CreditScoring:
 
         for indices in self.interconnections.values():
         
-            # TODO... WHAT IS THE CORRECT THING TO DO HERE:
+            # optionally checking if all common nodes are present in all layers 
+            if check_common_nodes_in_all_layers and len(indices) != len(self.layers):
+                raise Exception('Common node present only in subset of layers. Current indices: ', indices)
+            
             # it might happen that a node to interconnect appears only on one layer
-            #if len(indices) == 1:
-            #    continue
+            if len(indices) == 1:
+                continue
 
             # only the portion below the diagonal of the inter adj matrix is used in multinetX
             # use it to make the perform better (if not, to run at all!)
@@ -92,8 +106,17 @@ class CreditScoring:
         self.multilevel_graph = mx.MultilayerGraph(list_of_layers=self.layers, inter_adjacency_matrix=adj_block)
         if self.verbose: self.timer.report_time('Multilevel graph created')
 
+        # here we are conserned if the order of nodes into the adjancy matrix is correct and always the same.
+        # this site is telling us that his is not an issue if python 3.6 or newer is used: 
+        # https://networkx.github.io/documentation/stable/reference/classes/ordered.html
+
+        nodes = list(self.multilevel_graph.nodes())
+        
+        if not all(nodes[i] < nodes[i + 1] for i in range(len(nodes)-1)):
+            raise Exception("Nodes not in proper order for Adjacency matrix extraction") 
+
         # column normalized adj matrix
-        self.supra_transition_matrix = normalize(nx.to_scipy_sparse_matrix(self.multilevel_graph, dtype=np.int8), norm='l1', axis=0)
+        self.supra_transition_matrix = normalize(nx.to_scipy_sparse_matrix(self.multilevel_graph, dtype=np.int8), norm='l1', axis=0)        
         if self.verbose: self.timer.report_time('Adj matrix col normalized')
         
         # adds self.pers_matrix and self.defaulter_indices to the party
@@ -107,13 +130,13 @@ class CreditScoring:
 
         # do we need to be conserned about img (complex numbers!)
         leading_eigenvector = leading_eigenvectors[:, 0].real
-
-        self.leading_eigenvector_norm = leading_eigenvector / leading_eigenvector.sum()
+        
+        # normalize the eigenvector
+        self.leading_eigenvector_norm = leading_eigenvector / leading_eigenvector.sum() 
 
         # adds self.common_nodes_rankings and self.layer_specific_node_rankings to the class namespace
         self.sample_rankings()
         if self.verbose: self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
-
 
     def create_layer_from_csv(self, file_path, node_start_id = 0):
         """
@@ -167,7 +190,6 @@ class CreditScoring:
         # abandon labels for ids, here we are using the default value for the ordering parameter
         return nx.convert_node_labels_to_integers(g, first_label=node_start_id, ordering='default', label_attribute='name')
 
-
     def number_nodes_in_list(self):
         """
         Returns the total count of nodes in the list of networkX layers 
@@ -180,7 +202,6 @@ class CreditScoring:
             node_count += layer.number_of_nodes()
 
         return node_count
-
 
     def wire_interconnections(self):
         """
@@ -201,24 +222,15 @@ class CreditScoring:
                 else:
                     self.interconnections[name].append(node_id)
 
-
     def construct_persoal_matrix(self, file_name):
+        """
+        from a simple list of defaulter names in a text file, this function populates the personal matrix, self.pers_matrix 
+        """
         
-        defaulters = []
-        
-        #TODO: HERE WE HAVE ADOPTED TO THE R FORMAT BUT WE MUST BE MORE GENERAL THAN THAT --> SIMPLE LIST OF DEFAULTERS
         with open(file_name) as f:
-            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
-
-            for row in csv_reader:
-
-                if row[1] == '1':
-                    defaulters.append(row[0].strip())
+            defaulters = [row.strip() for row in f.readlines()]
 
         self.defaulter_indices = [index_list for (ident, index_list) in self.interconnections.items() if ident in defaulters]
-
-        #TODO: debug
-        #pprint(self.defaulter_indices)
 
         n = self.multilevel_graph.num_nodes
 
@@ -230,11 +242,11 @@ class CreditScoring:
             for i,j in set(permutations(indexes + indexes, 2)):
 
                 self.pers_matrix[i,j] = 1
-                #TODO: debug
-                #print(i,j)
-
 
     def print_stats(self):
+        """
+        Prints information on number of nodes of different types and endes in each layer and in the multilayer graph
+        """
 
         len_layer_name = [len(x.name) for x in self.layers]
         
@@ -261,12 +273,16 @@ class CreditScoring:
         print()
 
     def sample_rankings(self):
+        """
+        Calculates the final result, the ranking of nodes in the network. Ranings of common nodes are found in
+        the dict self.common_nodes_rankings. For the specific nodes the list self.layer_specific_node_rankings has
+        items (as dictionaries) for each layer of the multilayer grap.
+        """
 
-        # we are not concerned about ordering of the nodes in the networks 
-        # so we are going to return the results as dictionaries
+        maxValue = 0
 
         # first the dict for common nodes
-        self.common_nodes_rankings = {}
+        common_nodes_rankings = {}
 
         for node_ident, indices in self.interconnections.items():
 
@@ -276,16 +292,20 @@ class CreditScoring:
 
                 rank_sum += self.leading_eigenvector_norm[i]
 
-            self.common_nodes_rankings[node_ident] = rank_sum
+            common_nodes_rankings[node_ident] = rank_sum
+
+            if rank_sum > maxValue:
+                maxValue = rank_sum
 
         if self.verbose: 
             print()
-            print('Length of common nodes ranking dict: ', len(self.common_nodes_rankings))
+            print('Length of common nodes ranking dict: ', len(common_nodes_rankings))
+
 
         # then we propose a list of dictionaries for the rankings of specific nodes in each layer
         # (not knowing how many they are beforehand)
 
-        self.layer_specific_node_rankings = []
+        layer_specific_node_rankings = []
 
         for layer in self.multilevel_graph.list_of_layers:
 
@@ -295,14 +315,21 @@ class CreditScoring:
             
             for n, d in layer.nodes(data=True):
                 if d['bipartite'] == 1:
-                    layer_ranking_dict[d['name']] = self.leading_eigenvector_norm[n]
+                    #layer_ranking_dict[d['name']] = self.leading_eigenvector_norm[n]
+                    v = self.leading_eigenvector_norm[n]
+                    layer_ranking_dict[d['name']] = v
+                    if v > maxValue:
+                        maxValue = v
 
-            self.layer_specific_node_rankings.append(layer_ranking_dict)
+            layer_specific_node_rankings.append(layer_ranking_dict)
 
         if self.verbose:
-            for i, d in enumerate(self.layer_specific_node_rankings):
-
+            for i, d in enumerate(layer_specific_node_rankings):
                 print('Number records in dictionary of specific node rankins for layer {}: {}'.format(i, len(d)))
-
             print()
 
+        # finally we must normalize all values to have the maximum as 1
+        self.common_nodes_rankings = {key : value / maxValue for (key, value) in common_nodes_rankings.items()}
+        self.layer_specific_node_rankings = []
+        for un_norm_dict in layer_specific_node_rankings:
+            self.layer_specific_node_rankings.append({key : value / maxValue for (key, value) in un_norm_dict.items()})

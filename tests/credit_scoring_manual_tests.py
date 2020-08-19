@@ -9,18 +9,26 @@ from credit_scoring import CreditScoring
 
 data_directory = '.'
 
-files = ['products.csv', 'areas.csv', 'districts.csv']
-#files = ['products_tiny.csv', 'districts_tiny_no_dup.csv'] #, 'areas_tiny_no_dup.csv']
+#files = ['products.csv', 'areas.csv', 'districts.csv']
+files = ['products_tiny.csv', 'districts_tiny_no_dup.csv'] #, 'areas_tiny_no_dup.csv']
 
 file_paths = [os.path.join(data_directory, f) for f in files]
 
-personal_file = os.path.join(data_directory, 'll_tiny.csv')
+personal_file = os.path.join(data_directory, 'defaulters_list_tiny.txt')
 
-mlcs = CreditScoring(file_paths, personal_file, verbose=True)
+mlcs = CreditScoring(file_paths, personal_file, verbose=True, check_common_nodes_in_all_layers = False)
 
 mlcs.print_stats()
 
-#pprint(mlcs.common_nodes_rankings)
+print('Common nodes rankings')
+pprint(mlcs.common_nodes_rankings)
+
+for i, l in enumerate(mlcs.layer_specific_node_rankings):
+
+    print('Rankings for layer ', i)
+
+    pprint(l)
+
 sys.exit()
 print('--- MultiLayer info ---')
 layerdict = {}
@@ -45,6 +53,7 @@ numpy_array = adj_matrix.toarray()
 np.set_printoptions(threshold=sys.maxsize)
 print(numpy_array)
 
+print(mlcs.pers_matrix.toarray())
 # now checking the adj matrix by code ;)
 
 num_edges_found = 0
