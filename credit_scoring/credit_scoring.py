@@ -1,16 +1,14 @@
-try:
-    import multinetx as mx
-except ImportError:
-    raise ImportError("multinetx is required - see instructions for setup")
-
 import csv, os
 from itertools import permutations
 import numpy as np
-import networkx as nx
+from igraph import Graph
+from functools import reduce
+import pandas as pd
+from operator import and_
 from scipy.sparse.linalg import eigs
 from scipy.sparse import lil_matrix, dok_matrix
 from sklearn.preprocessing import normalize
-
+from collections import defaultdict
 import time
 from pprint import pprint
 
@@ -33,303 +31,250 @@ class Timer:
 
         self.increment_time = time.time()
 
-    
+   
 class CreditScoring:
 
-    def __init__(self, layer_files, personal_matrix_file, alpha = 0.85, csv_delimiter = ',', check_common_nodes_in_all_layers = True, verbose = False):
-        """    
-        Attributes
-        ----------
-        layer_files : a list of paths to csv files 
-            for layer construciton
-        personal_matrix_file : path to a text file 
-            listing all the defaulters
-        alpha : ratio 0<alpha<= 1
-            determines the influence of the personal matrix when calculationg the supra transition matrix. Defaults to 0.85
-        csv_delimiter : defaults to , (comma)
-            if other symbol is used it can be set here.
-        check_common_nodes_in_all_layers : boolean defaults to True
-            controls if a test for all common nodes are existing in all layers is included. If this test is run and single common
-            node are missing in a single layer a n exception is raised
-        verbose : boolean defualts to False
-            If set to True some extra information is printed to the console. Mostly concerning running times of the tasks performed. 
-        """
-        
+    def __init__(self, layer_files, alpha = 0.85,sparse = True,  verbose = False, common_nodes = None):
+        assert reduce(and_ , [f[-5:] == '.ncol' for f in layer_files]), "File not in ncol format"   
+        self.files = layer_files
+        self.filesNoExt = [f.strip(".ncol")for f in self.files]
         self.verbose = verbose
-        self.csv_delimiter = csv_delimiter
         self.timer = Timer()
-
-        # list containing networkX graphs for each layer
-        self.layers = []
-        
-        for f in layer_files:
-    
-            # if other files than csv are present, stop execution and inform user
-            if f[-4:] != '.csv':
-                raise Exception('Input file not of type csv!')       
-
-            self.layers.append(self.create_layer_from_csv(f, self.number_nodes_in_list()))
-
-        # extract the sets of nodes to be interconnected    
-        self.interconnect_sets = []
-    
-        for layer in self.layers:
-            self.interconnect_sets.append({n for n, d in layer.nodes(data=True) if d['bipartite']==0})
-
-        # adds self.interconnections to the party
-        self.wire_interconnections()
-
-        N = self.number_nodes_in_list()
-
-        adj_block = lil_matrix((N,N), dtype=np.int8)
-
-        for indices in self.interconnections.values():
-        
-            # optionally checking if all common nodes are present in all layers 
-            if check_common_nodes_in_all_layers and len(indices) != len(self.layers):
-                raise Exception('Common node present only in subset of layers. Current indices: ', indices)
+        self.sparse = sparse
+        self.labs = []
+        if common_nodes: 
+            common = pd.read_csv(common_nodes,header = None)
+            self.gs = {}
+            for f in self.files: 
+                g = Graph()
+                for _,node in common.iterrows(): 
+                    g.add_vertex(f'{node[0]}')
+                with open(f) as graphFile: 
+                    for line in graphFile:
+                        u, v= line.split()
+                        for n in [u,v]:
+                            if not len(g.vs.select(name=f'{n}')):
+                                g.add_vertex(n)
+                        g.add_edge(u,v)
+                self.gs[f.strip('.ncol')] = g 
             
-            # it might happen that a node to interconnect appears only on one layer
-            if len(indices) == 1:
+        else: 
+            self.gs = { f.strip('.ncol') : Graph.Read_Ncol(f) for f in self.files}
+
+        self.ns = { f: self.gs[f].vcount() for f in self.filesNoExt }
+        self.N = sum([self.ns.get(i) for i in self.ns])
+        self.startingInd = {}
+        self.layers = []
+        self.bounds = {}
+
+
+       
+        if sparse: 
+            self.adj_matrix = lil_matrix((self.N,self.N), dtype=np.int8)
+            self.personal = lil_matrix((self.N,self.N), dtype=np.int8)
+        else: 
+            self.adj_matrix = np.zeros((self.N,self.N))
+            self.personal = np.zeros((self.N,self.N))
+
+
+    def makeBounds(self): 
+        for i,f in enumerate(reversed(self.filesNoExt)): 
+
+            if i == 0: 
+                prev = f
+                self.bounds[f] = (self.startingInd[f],self.N - 1)
                 continue
 
-            # only the portion below the diagonal of the inter adj matrix is used in multinetX
-            # use it to make the perform better (if not, to run at all!)
-            indices.sort(reverse=True)
-
-            for i,j in permutations(indices, 2):
-
-                if i > j:
-                    adj_block[i, j] = 1
+            self.bounds[f] = (self.startingInd[f],self.startingInd[prev]-1)
+            prev = f
 
 
-        self.multilevel_graph = mx.MultilayerGraph(list_of_layers=self.layers, inter_adjacency_matrix=adj_block)
-        if self.verbose: self.timer.report_time('Multilevel graph created')
 
-        # here we are conserned if the order of nodes into the adjancy matrix is correct and always the same.
-        # this site is telling us that his is not an issue if python 3.6 or newer is used: 
-        # https://networkx.github.io/documentation/stable/reference/classes/ordered.html
-
-        nodes = list(self.multilevel_graph.nodes())
+    def buildAdjMatrix(self,bidirectional,intraFIle): 
+        intraDF = pd.read_csv(intraFIle)
+        n=0
+        '''
+        fills up adjacency matrix for inter graph connections using Igraph methods
         
-        if not all(nodes[i] < nodes[i + 1] for i in range(len(nodes)-1)):
-            raise Exception("Nodes not in proper order for Adjacency matrix extraction") 
+        '''
+        for f,g in zip(self.filesNoExt,self.gs): 
+            for edge in self.gs[g].get_edgelist(): 
+                self.adj_matrix[self.gs[f].vs.find(edge[0]).index + n ,self.gs[f].vs.find(edge[1]).index  + n ] = 1 
+            self.startingInd[f] = n
+            n+= self.ns[f]
 
-        # column normalized adj matrix
-        self.supra_transition_matrix = normalize(nx.to_scipy_sparse_matrix(self.multilevel_graph, dtype=np.int8), norm='l1', axis=0)        
+        '''
+        Makes bounds for when a graph starts and ends
+        '''
+        self.makeBounds()
+
+        '''
+        Fills up intra layer edges
+        '''
+        for _,row in intraDF.iterrows():
+            '''
+            Grab edge ids from both graphs
+            Then input into the correct column based on origin node 
+            '''
+            r = row[row.notna()]
+            assert (len(r) == 3) , f"Incorrect input format at row {r} in file {intraFIle}"
+            e1,e2,d = r 
+            ind = r.index
+            e1G = self.gs.get(ind[0])
+            e2G = self.gs.get(ind[1])
+
+            e1Ind = e1G.vs.find(f'{e1}').index
+            e2Ind = e2G.vs.find(f'{e2}').index
+            if d == 1 or d == 0 : 
+                self.adj_matrix[ e1Ind + self.startingInd[ind[0]],e2Ind + self.startingInd[ind[1]]] = 1 
+            elif d == -1: 
+                self.adj_matrix[e1Ind + self.startingInd[ind[1]] , e1Ind + self.startingInd[ind[0]]] = 1 
+        if bidirectional: self.adj_matrix+= self.adj_matrix.T
+        return self.adj_matrix
+
+    def pageRank(self,alpha,matrix,personal): 
+        '''
+        General personalized page rank given the adjacency matrix, personal matrix and alpha score
+        
+        '''
+        matrix = normalize( matrix, norm='l1', axis=0   )        
         if self.verbose: self.timer.report_time('Adj matrix col normalized')
-        
-        # adds self.pers_matrix and self.defaulter_indices to the party
-        self.construct_persoal_matrix(personal_matrix_file)
-        if self.verbose: self.timer.report_time('Personal matrix created')
+         
 
-        self.supra_transition_matrix = alpha * self.supra_transition_matrix + (1 - alpha)/self.pers_matrix.sum() * self.pers_matrix
+        matrix = alpha * matrix + (1 - alpha)/personal.sum() * personal
+       
         if self.verbose: self.timer.report_time('Supra trans matrix calculated')
 
-        _, leading_eigenvectors = eigs(self.supra_transition_matrix, 1)
+        self.supra = matrix
+        _, leading_eigenvectors = eigs(matrix, 1)
+
 
         # do we need to be conserned about img (complex numbers!)
         leading_eigenvector = leading_eigenvectors[:, 0].real
-        
         # normalize the eigenvector
         self.leading_eigenvector_norm = leading_eigenvector / leading_eigenvector.sum() 
+        pprint.pprint(f'{leading_eigenvector=}')
+        print(leading_eigenvector.sum() )
+        return self.leading_eigenvector_norm 
 
-        # adds self.common_nodes_rankings and self.layer_specific_node_rankings to the class namespace
-        self.sample_rankings()
-        if self.verbose: self.timer.report_time('Done eig. calcs. and sampling the ranking dictionaries')
+  
 
-    def create_layer_from_csv(self, file_path, node_start_id = 0):
-        """
-        Creates a network layer from a csv file
-
-        The first column in the csv file should hold names of nodes to be interconnected between layers, i.e. common nodes
-
-        Attributes
-        ----------
-        file_path : str
-            path to file, containing 2 columns, to be used in network layer construction
-        node_start_id : int
-            first id to assign to a node created, defaults to 0
-        """
-
-        # conversion to int nodes of this graph will eventually be returned from current function
-        g = nx.Graph()
-
-        # first pass over the csv file only creates the nodes with the appropriate bipartite attribute
-        # bipartite = 0 is used for nodes to be interconnected between layers
-        with open(file_path, encoding='utf8') as f:
-            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
-
-            externally_connected = [] #what about duplicates, are they to be expected? yes so this is ok I think.
-            internally_connected = set()
-
-            for row in csv_reader:
-
-                ext_node_str_id = row[0].strip()
-
-                externally_connected.append(ext_node_str_id)
-                internally_connected.add(row[1].strip())
-
-        g.add_nodes_from(externally_connected, bipartite=0)
-        g.add_nodes_from(internally_connected, bipartite=1)
-
-
-        # second pass creates a list of edges.
-        with open(file_path, encoding='utf8') as f:
-            csv_reader = csv.reader(f, delimiter = self.csv_delimiter)
-
-            # get the data as list of tuples
-            edges = [(row[0].strip(), row[1].strip()) for row in csv_reader]
-   
-        g.add_edges_from(edges)
-
-        # add name to the layer         
-        name = os.path.splitext(os.path.basename(file_path))[0]
-        g.name = name
-
-        # abandon labels for ids, here we are using the default value for the ordering parameter
-        return nx.convert_node_labels_to_integers(g, first_label=node_start_id, ordering='default', label_attribute='name')
-
-    def number_nodes_in_list(self):
-        """
-        Returns the total count of nodes in the list of networkX layers 
-
-        """
-
-        node_count = 0
-
-        for layer in self.layers:
-            node_count += layer.number_of_nodes()
-
-        return node_count
-
-    def wire_interconnections(self):
-        """
-        Retruns a descriptive datastrcuture (a dict of lists) describing how the nodes are to be interconnected.
-        The keys of the dict are node labels and the values are lists containing indices of where 
-        those nodes are found in the multilayer network structure 
-        """
-
-        self.interconnections = {}
-
-        for n,interconnect_set in enumerate(self.interconnect_sets):
-            for node_id in interconnect_set:
-
-                name = self.layers[n].nodes[node_id]['name']
-
-                if name not in self.interconnections:
-                    self.interconnections[name] = [node_id]
-                else:
-                    self.interconnections[name].append(node_id)
-
-    def construct_persoal_matrix(self, file_name):
-        """
-        from a simple list of defaulter names in a text file, this function populates the personal matrix, self.pers_matrix 
-        """
-        
-        with open(file_name) as f:
-            defaulters = [row.strip() for row in f.readlines()]
-
-        self.defaulter_indices = [index_list for (ident, index_list) in self.interconnections.items() if ident in defaulters]
-
-        n = self.multilevel_graph.num_nodes
-
-        self.pers_matrix = dok_matrix((n, n), dtype=np.int8)
-
-        for indexes in self.defaulter_indices:
-
-            # are there better ways to populate all indexes than gettin all 2 permutations of the doubled lists thrown into a set to remove duplicates
-            for i,j in set(permutations(indexes + indexes, 2)):
-
-                self.pers_matrix[i,j] = 1
-
-    def print_stats(self):
-        """
-        Prints information on number of nodes of different types and endes in each layer and in the multilayer graph
-        """
-
-        len_layer_name = [len(x.name) for x in self.layers]
-        
-        len_longest_lname = max(len_layer_name)
-
-        padding_1 = '{:' + str(len_longest_lname) + '} {:^15} {:^15} {:^15} {:^15}'
-        padding_2 = '{:' + str(len(self.multilevel_graph.name)) + '} {:^15} {:^15}'
-
-        print()
-        print(padding_1.format('Layer name', 'Total nodes', 'Common nodes', 'Special nodes', 'Number of edges'))
-
-        for l in self.layers:
     
-            number_of_zero_bipatrite_nodes = len({n for n, d in l.nodes(data=True) if d['bipartite']==0})
-            number_of_one_bipartite_nodes = len({n for n, d in l.nodes(data=True) if d['bipartite']==1})
+    def getGraph(self , ind):
+        '''
+        Given an index of the adjacency matrix returns what graph it belongs to 
+        '''
+        for g in self.bounds:
+            low , up = self.bounds[g]
+
+            if ind <= up and low <= ind : 
+                return g
+
+
+    def rank(self,eigenVects):
+        '''
+        gathers node ids using their index in the leading eigenvector to return final page rank scores
+        '''
+        rankings = defaultdict(dict)
+        for i,val in enumerate(eigenVects):
+            g = self.getGraph(i)
+            node = self.ns[g] - (self.bounds[g][1] - i  ) - 1
+            name = self.gs[g].vs[node]['name']
+            rankings[g][name] = val
+        return rankings
+
+
+    def getLabels(self):
+        labs = [ ]
+        for g in self.gs:
+            for node in self.gs[g].vs:
+                labs.append(node['name'])
+        return labs
+
+
+    def writeCSV(self,matrix,f): 
+        if not self.labs:
+            self.labs = self.getLabels()
+        
+        return pd.DataFrame(data = matrix, columns= self.labs, index =self.labs ).to_csv(f)
+
+
+
+    def construct_personal_matrix(self, file_name, labels = None):
+        '''
+        constructs personal matrix given a csv file 
+        csv file format: 
+
+        l1,l2,l3,d
+        1,,1,1
     
-            print(padding_1.format(l.name, l.number_of_nodes(), number_of_zero_bipatrite_nodes, number_of_one_bipartite_nodes, l.number_of_edges()))
+        Important to have null/missing value in the layer that is not getting an edge added
+        the above represents a directed edge from l1 node 1 -> l2 node 1 
 
-        if self.multilevel_graph:
-            print()
-            print(padding_2.format('Multi layer name', 'Number of nodes', 'Number of edges'))
-            print(padding_2.format(self.multilevel_graph.name, self.multilevel_graph.number_of_nodes(), self.multilevel_graph.number_of_edges()))
+        To represent l2 node 1 -> l1 node 1 we can simply do that by indicating a negative direction in the direction column: 
 
-        print()
+        l1,l2,l3,d
+        1,,1,-1
 
-    def sample_rankings(self):
-        """
-        Calculates the final result, the ranking of nodes in the network. Ranings of common nodes are found in
-        the dict self.common_nodes_rankings. For the specific nodes the list self.layer_specific_node_rankings has
-        items (as dictionaries) for each layer of the multilayer grap.
-        """
+        '''
+        labels = self.getLabels()
+        personalDF = pd.read_csv(file_name,dtype = str)
+        for _,row in personalDF.iterrows():
+            r = row[row.notna()]
 
-        maxValue = 0
+            assert (len(r) == 1) , f"Incorrect input format at row {r} in file {file_name}"
+            lab = r.index
+            ind  = self.gs[lab[0]].vs.find(f'{r[0]}').index
+            start = self.startingInd[lab[0]]
+            _,cs = self.adj_matrix[ start + ind , :  ].nonzero()
+            self.personal[ind + start , start + ind ] = 1
+            t = [labels[i] for i in cs]
 
-        # first the dict for common nodes
-        common_nodes_rankings = {}
+            for i in  cs: 
+                g = self.getGraph(i)
+                g2 = self.getGraph(start + ind)
+                if g != g2:
+                    diag = self.ns[g] - (self.bounds[g][1] - i  ) - 1
+                    
+                    self.personal[start + diag,i] += 1
+        return self.personal
+    def construct_personal_matrix2(self, file_name, labels = None):
+        '''
+        constructs personal matrix given a csv file 
+        csv file format: 
 
-        for node_ident, indices in self.interconnections.items():
+        l1,l2,l3,d
+        1,,1,1
+    
+        Important to have null/missing value in the layer that is not getting an edge added
+        the above represents a directed edge from l1 node 1 -> l2 node 1 
 
-            rank_sum = 0
+        To represent l2 node 1 -> l1 node 1 we can simply do that by indicating a negative direction in the direction column: 
 
-            for i in indices:
+        l1,l2,l3,d
+        1,,1,-1
 
-                rank_sum += self.leading_eigenvector_norm[i]
+        '''
+        labels = self.getLabels()
+        personalDF = pd.read_csv(file_name,dtype = str)
+        for _,row in personalDF.iterrows():
+            r = row[row.notna()]
 
-            common_nodes_rankings[node_ident] = rank_sum
+            assert (len(r) == 1) , f"Incorrect input format at row {r} in file {file_name}"
+            lab = r.index
+            ind  = self.gs[lab[0]].vs.find(f'{r[0]}').index
+            start = self.startingInd[lab[0]]
+            _,cs = self.adj_matrix[ start + ind ,:].nonzero()
+            self.personal[ind + start , start + ind ] = 1
+            t = [labels[i] for i in cs]
 
-            if rank_sum > maxValue:
-                maxValue = rank_sum
+            for i in  cs: 
+                g = self.getGraph(i)
+                g2 = self.getGraph(start + ind)
+                if g != g2:
+                    diag = self.ns[g] - (self.bounds[g][1] - i  ) - 1
+                    # interest = labels[ind + start ]
 
-        if self.verbose: 
-            print()
-            print('Length of common nodes ranking dict: ', len(common_nodes_rankings))
-
-
-        # then we propose a list of dictionaries for the rankings of specific nodes in each layer
-        # (not knowing how many they are beforehand)
-
-        layer_specific_node_rankings = []
-
-        for layer in self.multilevel_graph.list_of_layers:
-
-            layer_ranking_dict = {}
-
-            # get the bipartite=1 set of nodes on current layer
-            
-            for n, d in layer.nodes(data=True):
-                if d['bipartite'] == 1:
-                    #layer_ranking_dict[d['name']] = self.leading_eigenvector_norm[n]
-                    v = self.leading_eigenvector_norm[n]
-                    layer_ranking_dict[d['name']] = v
-                    if v > maxValue:
-                        maxValue = v
-
-            layer_specific_node_rankings.append(layer_ranking_dict)
-
-        if self.verbose:
-            for i, d in enumerate(layer_specific_node_rankings):
-                print('Number records in dictionary of specific node rankins for layer {}: {}'.format(i, len(d)))
-            print()
-
-        # finally we must normalize all values to have the maximum as 1
-        self.common_nodes_rankings = {key : value / maxValue for (key, value) in common_nodes_rankings.items()}
-        self.layer_specific_node_rankings = []
-        for un_norm_dict in layer_specific_node_rankings:
-            self.layer_specific_node_rankings.append({key : value / maxValue for (key, value) in un_norm_dict.items()})
+                    # print(f'{r[0]=} {cs }{t=} {start=} {diag =} {diag + start=} {labels[i]=} {labels[start + diag]=}  {interest=} '); 
+                    self.personal[ind + start,i] += 1
+        return self.personal 
