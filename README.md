@@ -14,13 +14,11 @@ Since one dependancy, **multinetx** is not a published PyPI package, this additi
 pip install git+https://github.com/nkoub/multinetx.git
 ```
 
-# Usage instructions
+# Input instructions
 
-What is *currently* supported regarding the format of the input data:
+Each layer in the multilayer network requires it's own .ncol file with the appropriate [ncol](http://lgl.sourceforge.net) file format.
 
-> The multilayer network can be built from 2 column csv files, one for each layer. Here the common nodes are arranged in the first column and the nodes specific to the layer in question are in the latter column. The nodes present in each row of the file form an edge between them in the bipartite network generated.
-
-Example csv layer file (layer1.csv):
+Example ncol layer file (layer1.ncol):
 
 ```
 CommonNodeA SpecificNodeA
@@ -29,36 +27,89 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
+The inter-layer connections can be built using a csv file with the following format: 
+
+Example inter-layer connection file; 
+```
+FilenameForLayer1,FilenameForLayer2,FilenameForLayer3,d 
+Layer1NodeName,Layer2NodeName,,1
+,Layer2NodeName,Laye31NodeName,1
+Layer1NodeName,,Layer3NodeName,-1
+```
+
+The headers of the csv file MUST MATCH the name of the file of the corresponding layer, ie: if you have a layer1.ncol file, its appropriate name on the inter-layer file would be layer1. Each edge is built individually, so the only non null entries in the csv row should be the names of the edges in the files which you are trying to connect and their direction(d header). A direction of 1 build a link left -> right, layer1 -> layer2, while a -1 tag specifies layer2 -> layer1. 
+
 Having a list of paths to such files and a file listing the defaulters for the Personilazation matrix, enables us to calculate the rankings like so:
 
+Common Nodes (**Optional**)
+
+If your layers have common nodes, you may create a common_nodes.csv file with the following format. Note this input expects **all layers** to have these nodes. 
+
+```csv
+nodeName1
+nodeName2
+nodeName3
+```
+
+# Usage 
 ```python
 
-from credit_scoring improt CreditScoring
+from credit_scoring improt MLN
 
-mlcs = CreditScoring(['./layer1.csv', './layer2.csv'], './defaulters.txt', alpha = 0.85, csv_delimiter = ',', verbose=True)
+mln = MLN( layer_files=['layer1.ncol','layer2.ncol'], alpha = 0.85,sparse = True, common_nodes= 'common.csv')
 
-mlcs.print_stats()
 
 ```
-The `alpha` parameter to the CreditScoring constructor is an optional one and defaults to the value `0.85`. It is used in the personalized pagerank algorithm.
+`sparse`: Indicates whether or not you want to use sparse matrices for computations or simply use dense ones. 
+`common_nodes`: Optional, defaults to None. Specifies the common_nodes file 
 
-The `verbose` parameter defaults to `False`, if set to `True` some information is printed to the console regarding running times and more.
+Returns a multilayer network
 
-The `csv_delimiter` abve is shwon in its default value. No need to specify it explicity if not changed.
+```python
+matrix = mln.buildAdjMatrix(intraFIle= 'intra.csv', bidirectional = True)
+```
+`bidrectional`: Indicates wheter the node links are directed or undirected
 
-`print_stats()` prints some counting figures for nodes and links of the networks generated.
+Outputs a Multilayer adjecency matrix as a scipy sparse amtrix or a dense numpy array
 
-To access the results, query the following members of the CreditScoring class instance:
+To Construct the personal matrix : 
 
-```common_nodes_rankings``` gives a dictionary from common node identifiers (as seen the csv layer files) to the aggregated rankings.
+```python
+personal = mln.construct_personal_matrix('personal.csv')
+```
 
-```layer_specific_node_rankings``` gives a list of dictionaries (one for each layer) for the rankings of the nodes specific to that layer.
+To run page rank with an appropriate personal matrix and adjecency matrix; 
+
+```
+vect = ranker.pageRank(alpha = .85,matrix= matrix, personal = personal)
+```
+`alpha`: Defaults to the value `0.85`. It is the exploration rate used in the personalized pagerank algorithm.
+`adj_matrix`: corresponding adjecency matrix to use
+`personal`: corresponding personal matrix to use
+
+returns leading eigen vector 
+
+To view the rankings in a json format: 
+```python
+mlp.view(vect = vect)
+```
+`vect`: the leading eigenvector computed
+
+sample output: 
+```json
+ {
+    'LAYER1': 
+            {
+                'NODE1': -7,
+                'NODE2': -4},
+    'LAYER2': 
+             {
+                'NODE1': 5,
+                'NODE2': -1,
+             }
+}
+
+```
 
 
-
-TODO...REMAINING IN THE IMPLEMENTATION
-
-+ Network_type, defaUlt is bipartite multilayer but mulitplex can also be specified !?! //TODO: check this further.
-+ Measures to ensure the same set of common nodes in each layer... if needed.
-+ if we want to turn of the printouts, we could have a default verbose flag to the constructor.
 
