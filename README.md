@@ -5,20 +5,20 @@ This repository/package includes a python script that implements the MultilayerC
 # Installation
 
 ```
-pip install multilayer-credit-scoring
-```
-
-Since one dependancy, **multinetx** is not a published PyPI package, this additional step is needed so everything runs smoothly.
-
-```
-pip install git+https://github.com/nkoub/multinetx.git
+pip install MuLP
 ```
 
 # Input instructions
 
-Each layer in the multilayer network requires it's own .ncol file with the appropriate [ncol](http://lgl.sourceforge.net) file format.
+There are four primary input files: 
 
-Example ncol layer file (layer1.ncol):
+* Individual layer files (.ncol)
+* Common Nodes file (csv)
+* Personal Node file (csv)
+
+Each layer in the multilayer network requires it's own .ncol file with the appropriate [ncol file format](http://lgl.sourceforge.net).
+
+Example ncol layer file (.ncol):
 
 ```
 CommonNodeA SpecificNodeA
@@ -27,89 +27,87 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-The inter-layer connections can be built using a csv file with the following format: 
+The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Bravo & Óskarsdóttir, due to this one must specify what are the common nodes in the following format:
 
-Example inter-layer connection file; 
+Example input file(.csv): 
 ```
-FilenameForLayer1,FilenameForLayer2,FilenameForLayer3,d 
-Layer1NodeName,Layer2NodeName,,1
-,Layer2NodeName,Laye31NodeName,1
-Layer1NodeName,,Layer3NodeName,-1
+CommonNode1
+CommonNode2
+CommonNode3
 ```
+To construct the personal matrix one must specify the influential or personal nodes in the following format: 
 
-The headers of the csv file MUST MATCH the name of the file of the corresponding layer, ie: if you have a layer1.ncol file, its appropriate name on the inter-layer file would be layer1. Each edge is built individually, so the only non null entries in the csv row should be the names of the edges in the files which you are trying to connect and their direction(d header). A direction of 1 build a link left -> right, layer1 -> layer2, while a -1 tag specifies layer2 -> layer1. 
+Example input file(.csv): 
 
-Having a list of paths to such files and a file listing the defaulters for the Personilazation matrix, enables us to calculate the rankings like so:
-
-Common Nodes (**Optional**)
-
-If your layers have common nodes, you may create a common_nodes.csv file with the following format. Note this input expects **all layers** to have these nodes. 
-
-```csv
-nodeName1
-nodeName2
-nodeName3
+```
+InfluentialNode1
+InfluentialNode2
+InfluentialNode3
 ```
 
 # Usage 
-```python
 
-from credit_scoring improt MLN
+### Multilayer Network Initialization
+To create a Multilayer Network the following arguments are available: 
 
-mln = MLN( layer_files=['layer1.ncol','layer2.ncol'], alpha = 0.85,sparse = True, common_nodes= 'common.csv')
+```layer_files (list)```: list of layer files 
 
+```common_nodes_file (str)```: csv file to common nodes 
 
-```
-`sparse`: Indicates whether or not you want to use sparse matrices for computations or simply use dense ones. 
-`common_nodes`: Optional, defaults to None. Specifies the common_nodes file 
+```personal_file (str)```: file to create personal matrix 
 
-Returns a multilayer network
+```biderectional (bool, optional)```: wheter edges are biderectional or not. Defaults to False.
 
-```python
-matrix = mln.buildAdjMatrix(intraFIle= 'intra.csv', bidirectional = True)
-```
-`bidrectional`: Indicates wheter the node links are directed or undirected
-
-Outputs a Multilayer adjecency matrix as a scipy sparse amtrix or a dense numpy array
-
-To Construct the personal matrix : 
+```sparse (bool, optional)```: use sparse or desnse matrix. Defaults to True.
 
 ```python
-personal = mln.construct_personal_matrix('personal.csv')
+
+from MultiLayerRanker import MultiLayerRanker
+ranker = MultiLayerRanker(layer_files=['products.ncol','districts.ncol'],
+                           common_nodes_file= './common.csv',
+                           personal_file= './personal.csv' ,
+                           biderectional=True,
+                           sparse = True)
 ```
+### Ranking
 
-To run page rank with an appropriate personal matrix and adjecency matrix; 
+The ```rank``` method of the ```MultiLayerRanker``` class runs the 
+MultiLayer Personalized Page Rank Algorithm. One can choose to run different experiments with varyin alphas by specifying it in the method call: 
 
-```
-vect = ranker.pageRank(alpha = .85,matrix= matrix, personal = personal)
-```
-`alpha`: Defaults to the value `0.85`. It is the exploration rate used in the personalized pagerank algorithm.
-`adj_matrix`: corresponding adjecency matrix to use
-`personal`: corresponding personal matrix to use
+```alpha (int,optional)```: page rank exploration parameter, defaults to .85  
 
-returns leading eigen vector 
-
-To view the rankings in a json format: 
 ```python
-mlp.view(vect = vect)
+eigs = ranker.pageRank(alpha = .85)
 ```
-`vect`: the leading eigenvector computed
 
-sample output: 
-```json
- {
-    'LAYER1': 
-            {
-                'NODE1': -7,
-                'NODE2': -4},
-    'LAYER2': 
-             {
-                'NODE1': 5,
-                'NODE2': -1,
-             }
-}
+This method returns the leading eigenvector corresponding to the each node's rank. 
 
+### Output Formatting
+
+The ```formattedRanks``` method allows you to get the rankings with appropriate node labels in a dictionary format: x
+ 
+
+```eigs (ndarray)```: corresponding eigenvector to format 
+
+```python
+ranker.formattedRanks(eigs)
 ```
+
+The  ```adjDF``` method allows you to view format a personal or adjacency matrix with corresponding labels as a dataframe: 
+
+```matrix (ndarray)``` : an adj matrix or personal matrix to transform
+
+```f (str,optional)```: Optional if you wish to write the df to an output csv
+
+```python 
+#for persoanl matrix
+personalDF = ranker.toDf(ranker.personal)
+#for adj matrix
+adjDf = ranker.toDf(ranker.matrix)
+```
+
+
+
 
 
 
