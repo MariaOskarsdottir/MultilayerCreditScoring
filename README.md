@@ -1,4 +1,4 @@
-# MultilayerCreditScoring
+# MuLP
 
 This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
 
