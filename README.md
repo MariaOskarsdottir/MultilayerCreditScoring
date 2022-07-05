@@ -1,6 +1,6 @@
 # MuLP
 
-This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
+This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithm presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
 
 # Installation
 
@@ -10,13 +10,13 @@ pip install MuLP
 
 # Input instructions
 
-There are four primary input files: 
+There are three primary input files: 
 
 * Individual layer files (.ncol)
 * Common Nodes file (csv)
 * Personal Node file (csv)
 
-Each layer in the multilayer network requires it's own .ncol file with the appropriate [ncol file format](http://lgl.sourceforge.net).
+Each layer in the multilayer network requires its own .ncol file with the appropriate [ncol file format](http://lgl.sourceforge.net).
 
 Example ncol layer file (.ncol):
 
@@ -27,7 +27,7 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Bravo & Óskarsdóttir, due to this one must specify what are the common nodes in the following format:
+The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo. Due to this one must specify what the common nodes are in the following format:
 
 Example input file(.csv): 
 ```
@@ -35,7 +35,7 @@ CommonNode1
 CommonNode2
 CommonNode3
 ```
-To construct the personal matrix one must specify the influential or personal nodes in the following format: 
+To construct the personal matrix one must specify the influence (or personal) nodes in the following format: 
 
 Example input file(.csv): 
 
@@ -80,7 +80,7 @@ MultiLayer Personalized Page Rank Algorithm. One can choose to run different exp
 eigs = ranker.pageRank(alpha = .85)
 ```
 
-This method returns the leading eigenvector corresponding to the each node's rank. 
+This method returns the leading eigenvector corresponding to each node's rank. 
 
 ### Output Formatting
 
