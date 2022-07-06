@@ -3,14 +3,14 @@ with open("README.md", "r") as fh:
     long_descripiton = fh.read()
 
 setuptools.setup(
-    name="multilayer-credit-scoring",
-    version="0.0.8",
-    author="Sigurjon Thorsteinsson",
-    author_email="grjoni80@gmail.com",
-    description="Python implementation of the MultilayerCreditScoring algorithm",
+    name="MuLP",
+    version="0.0.5",
+    author="Sigurjon Thorsteinsson, Emiliano Penaloza",
+    author_email="grjoni80@gmail.com, emilianopp550@gmail.com",
+    description="Python implementation of the Multilayer Personalized Page Rank algorithm",
     long_description=long_descripiton,
     long_description_content_type="text/markdown",
-    url="https://github.com/MariaOskarsdottir/MultilayerCreditScoring",
+    url="https://github.com/Banking-Analytics-Lab/MuLP",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.8",
@@ -18,11 +18,13 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",
+    setup_requires=["numpy","scikit-learn","igraph"], 
     install_requires=[
-        "numpy==1.19",
-        "networkx==2.3",
-        "scipy==1.5",
-        "scikit-learn==0.23" ,
-        # "multinetx @ git+ssh://git@github.com/nkoub/multinetx.git#egg=multinetx-2.3" # looks like dependancy like this is not allowed to be uploaded on PyPI
-    ]
+        "scikit-learn",
+        "numpy",
+        "scipy",
+        "igraph",
+        "pandas"
+        ]
 )
+
