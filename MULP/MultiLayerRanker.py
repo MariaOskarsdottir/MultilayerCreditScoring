@@ -18,15 +18,15 @@ from typing import List
 
 class MultiLayerRanker:
 
-    def __init__(self, layer_files, common_nodes_file, personal_file, biderectional=False, sparse=True):
+    def __init__(self, layer_files, common_nodes_file, personal_file, bidirectional=False, sparse=True):
         """Initializer for Multi Layer Ranker
 
         Args:
             layer_files (list): list of layer files 
             common_nodes_file (str): csv file to common nodes 
             personal_file (str): file to create personal matrix 
-            biderectional (bool, optional): wheter edges are biderectional or not. Defaults to False.
-            sparse (bool, optional): use sparse or desnse matrix. Defaults to True.
+            bidirectional (bool, optional): wheter edges are bidirectional or not. Defaults to False.
+            sparse (bool, optional): use sparse or dense matrix. Defaults to True.
         """
         assert reduce(
             and_, [f[-5:] == '.ncol' for f in layer_files]), "File not in ncol format"
@@ -68,7 +68,7 @@ class MultiLayerRanker:
             self.adj_matrix = np.zeros((self.N, self.N))
             self.personal = np.zeros((self.N, self.N))
         # build adj matrix
-        self.buildAdjMatrix(biderectional)
+        self.buildAdjMatrix(bidirectional)
         # build personal matrix
         self.construct_personal_matrix()
 
@@ -88,10 +88,10 @@ class MultiLayerRanker:
 
     def pageRank(self, alpha=.85):
         """
-        General personalized page rank given the adjacency matrix, personal matrix and alpha score
+        General personalized PageRank given the adjacency matrix, personal matrix and alpha score
 
         Args:
-            alpha (int): page rank exploration parameter, defaults to .85 
+            alpha (int): PageRank exploration parameter, defaults to .85 
 
         Returns:
             array: leading eigen vector corresponding to the rank of each node 
@@ -233,15 +233,15 @@ class MultiLayerRanker:
 
 class MultiLayerRanker:
 
-    def __init__(self, layer_files, common_nodes_file, personal_file, biderectional=False, sparse=True):
+    def __init__(self, layer_files, common_nodes_file, personal_file, bidirectional=False, sparse=True):
         """Initializer for Multi Layer Ranker
 
         Args:
             layer_files (list): list of layer files 
             common_nodes_file (str): csv file to common nodes 
             personal_file (str): file to create personal matrix 
-            biderectional (bool, optional): wheter edges are biderectional or not. Defaults to False.
-            sparse (bool, optional): use sparse or desnse matrix. Defaults to True.
+            bidirectional (bool, optional): wheter edges are bidirectional or not. Defaults to False.
+            sparse (bool, optional): use sparse or dense matrix. Defaults to True.
         """
         assert reduce(
             and_, [f[-5:] == '.ncol' for f in layer_files]), "File not in ncol format"
@@ -283,7 +283,7 @@ class MultiLayerRanker:
             self.adj_matrix = np.zeros((self.N, self.N))
             self.personal = np.zeros((self.N, self.N))
         # build adj matrix
-        self.buildAdjMatrix(biderectional)
+        self.buildAdjMatrix(bidirectional)
         # build personal matrix
         self.construct_personal_matrix()
 
@@ -303,10 +303,10 @@ class MultiLayerRanker:
 
     def pageRank(self, alpha=.85):
         """
-        General personalized page rank given the adjacency matrix, personal matrix and alpha score
+        General personalized PageRank given the adjacency matrix, personal matrix and alpha score
 
         Args:
-            alpha (int): page rank exploration parameter, defaults to .85 
+            alpha (int): PageRank exploration parameter, defaults to .85 
 
         Returns:
             array: leading eigen vector corresponding to the rank of each node 
