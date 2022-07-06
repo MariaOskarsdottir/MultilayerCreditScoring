@@ -1,26 +1,24 @@
-# MultilayerCreditScoring
+# MuLP
 
-This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
+This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithm presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
 
 # Installation
 
 ```
-pip install multilayer-credit-scoring
+pip install MuLP
 ```
 
-Since one dependancy, **multinetx** is not a published PyPI package, this additional step is needed so everything runs smoothly.
+# Input instructions
 
-```
-pip install git+https://github.com/nkoub/multinetx.git
-```
+There are three primary input files: 
 
-# Usage instructions
+* Individual layer files (.ncol)
+* Common Nodes file (csv)
+* Personal Node file (csv)
 
-What is *currently* supported regarding the format of the input data:
+Each layer in the multilayer network requires its own .ncol file with the appropriate [ncol file format](http://lgl.sourceforge.net).
 
-> The multilayer network can be built from 2 column csv files, one for each layer. Here the common nodes are arranged in the first column and the nodes specific to the layer in question are in the latter column. The nodes present in each row of the file form an edge between them in the bipartite network generated.
-
-Example csv layer file (layer1.csv):
+Example ncol layer file (.ncol):
 
 ```
 CommonNodeA SpecificNodeA
@@ -29,36 +27,87 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-Having a list of paths to such files and a file listing the defaulters for the Personilazation matrix, enables us to calculate the rankings like so:
+The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo. Due to this one must specify what the common nodes are in the following format:
+
+Example input file(.csv): 
+```
+CommonNode1
+CommonNode2
+CommonNode3
+```
+To construct the personal matrix one must specify the influence (or personal) nodes in the following format: 
+
+Example input file(.csv): 
+
+```
+InfluentialNode1
+InfluentialNode2
+InfluentialNode3
+```
+
+# Usage 
+
+### Multilayer Network Initialization
+To create a Multilayer Network the following arguments are available: 
+
+```layer_files (list)```: list of layer files 
+
+```common_nodes_file (str)```: csv file to common nodes 
+
+```personal_file (str)```: file to create personal matrix 
+
+```biderectional (bool, optional)```: wheter edges are biderectional or not. Defaults to False.
+
+```sparse (bool, optional)```: use sparse or desnse matrix. Defaults to True.
 
 ```python
 
-from credit_scoring improt CreditScoring
-
-mlcs = CreditScoring(['./layer1.csv', './layer2.csv'], './defaulters.txt', alpha = 0.85, csv_delimiter = ',', verbose=True)
-
-mlcs.print_stats()
-
+from MultiLayerRanker import MultiLayerRanker
+ranker = MultiLayerRanker(layer_files=['products.ncol','districts.ncol'],
+                           common_nodes_file= './common.csv',
+                           personal_file= './personal.csv' ,
+                           biderectional=True,
+                           sparse = True)
 ```
-The `alpha` parameter to the CreditScoring constructor is an optional one and defaults to the value `0.85`. It is used in the personalized pagerank algorithm.
+### Ranking
 
-The `verbose` parameter defaults to `False`, if set to `True` some information is printed to the console regarding running times and more.
+The ```rank``` method of the ```MultiLayerRanker``` class runs the 
+MultiLayer Personalized Page Rank Algorithm. One can choose to run different experiments with varyin alphas by specifying it in the method call: 
 
-The `csv_delimiter` abve is shwon in its default value. No need to specify it explicity if not changed.
+```alpha (int,optional)```: page rank exploration parameter, defaults to .85  
 
-`print_stats()` prints some counting figures for nodes and links of the networks generated.
+```python
+eigs = ranker.pageRank(alpha = .85)
+```
 
-To access the results, query the following members of the CreditScoring class instance:
+This method returns the leading eigenvector corresponding to each node's rank. 
 
-```common_nodes_rankings``` gives a dictionary from common node identifiers (as seen the csv layer files) to the aggregated rankings.
+### Output Formatting
 
-```layer_specific_node_rankings``` gives a list of dictionaries (one for each layer) for the rankings of the nodes specific to that layer.
+The ```formattedRanks``` method allows you to get the rankings with appropriate node labels in a dictionary format: x
+ 
+
+```eigs (ndarray)```: corresponding eigenvector to format 
+
+```python
+ranker.formattedRanks(eigs)
+```
+
+The  ```adjDF``` method allows you to view format a personal or adjacency matrix with corresponding labels as a dataframe: 
+
+```matrix (ndarray)``` : an adj matrix or personal matrix to transform
+
+```f (str,optional)```: Optional if you wish to write the df to an output csv
+
+```python 
+#for persoanl matrix
+personalDF = ranker.toDf(ranker.personal)
+#for adj matrix
+adjDf = ranker.toDf(ranker.matrix)
+```
 
 
 
-TODO...REMAINING IN THE IMPLEMENTATION
 
-+ Network_type, defaUlt is bipartite multilayer but mulitplex can also be specified !?! //TODO: check this further.
-+ Measures to ensure the same set of common nodes in each layer... if needed.
-+ if we want to turn of the printouts, we could have a default verbose flag to the constructor.
+
 
