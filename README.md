@@ -1,6 +1,6 @@
 # MuLP
 
-This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithm presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
+This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in Bravo and Óskarsdóttir (2020) and Óskarsdóttir and Bravo (2021, [ArXiV](https://arxiv.org/abs/2010.09559), [Publisher](https://doi.org/10.1016/j.omega.2021.102520))
 
 # Installation
 
@@ -27,7 +27,7 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo. Due to this one must specify what the common nodes are in the following format:
+The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo (2021): 
 
 Example input file(.csv): 
 ```

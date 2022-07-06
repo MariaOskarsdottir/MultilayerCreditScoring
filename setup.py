@@ -5,8 +5,8 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="MuLP",
     version="0.0.5",
-    author="Sigurjon Thorsteinsson, Emiliano Penaloza",
-    author_email="grjoni80@gmail.com, emilianopp550@gmail.com",
+    author="Sigurjon Thorsteinsson, Emiliano Penaloza, Cristian Bravo Roman, María Óskarsdóttir",
+    author_email="grjoni80@gmail.com, emilianopp550@gmail.com, cbravoro@uwo.ca, mariaoskars@ru.is",
     description="Python implementation of the Multilayer Personalized Page Rank algorithm",
     long_description=long_descripiton,
     long_description_content_type="text/markdown",
@@ -27,4 +27,5 @@ setuptools.setup(
         "pandas"
         ]
 )
+
 
