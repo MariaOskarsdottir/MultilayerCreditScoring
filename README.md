@@ -4,6 +4,8 @@ This repository/package includes a python script that implements the MultilayerC
 
 # Installation
 
+The package is [available in PyPi](https://pypi.org/project/MuLP/).
+
 ```
 pip install MuLP
 ```
