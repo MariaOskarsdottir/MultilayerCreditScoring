@@ -1,10 +1,8 @@
 # MuLP
 
-This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithm presented in the paper [Evolution of Credit Risk Using a Personalized Pagerank Algorithm for Multilayer Networks](https://arxiv.org/abs/2005.12418).
+This repository/package includes a python script that implements the MultilayerCreditScoring (MCS) algorithim presented in [Bravo and Óskarsdóttir (2020)](https://doi.org/10.48550/arXiv.2005.12418) and Óskarsdóttir and Bravo (2021, [ArXiV](https://arxiv.org/abs/2010.09559) , [Publisher](https://doi.org/10.1016/j.omega.2021.102520))
 
 # Installation
-
-The package is [available in PyPi](https://pypi.org/project/MuLP/).
 
 ```
 pip install MuLP
@@ -29,7 +27,7 @@ CommonNodeC SpecificNodeB
 CommonNodeD SpecificNodeC
 ```
 
-The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo. Due to this one must specify what the common nodes are in the following format:
+The inter-layer connections are only allowed between common nodes as to follow the structure layed out by Óskarsdóttir & Bravo (2021): 
 
 Example input file(.csv): 
 ```
@@ -37,9 +35,7 @@ CommonNode1
 CommonNode2
 CommonNode3
 ```
-To construct the personal matrix one must specify the influence (or personal) nodes in the following format: 
-
-Example input file(.csv): 
+To construct the personal matrix one must specify the influence (or personal) nodes in the following format (example input .csv file):
 
 ```
 InfluentialNode1
@@ -58,25 +54,25 @@ To create a Multilayer Network the following arguments are available:
 
 ```personal_file (str)```: file to create personal matrix 
 
-```biderectional (bool, optional)```: wheter edges are biderectional or not. Defaults to False.
+```bidirectional (bool, optional)```: wheter edges are biderectional or not. Defaults to False.
 
-```sparse (bool, optional)```: use sparse or desnse matrix. Defaults to True.
+```sparse (bool, optional)```: use sparse or dense matrix. Defaults to True.
 
 ```python
 
-from MultiLayerRanker import MultiLayerRanker
+from MuLP import MultiLayerRanker
 ranker = MultiLayerRanker(layer_files=['products.ncol','districts.ncol'],
                            common_nodes_file= './common.csv',
                            personal_file= './personal.csv' ,
-                           biderectional=True,
+                           bidirectional=True,
                            sparse = True)
 ```
 ### Ranking
 
 The ```rank``` method of the ```MultiLayerRanker``` class runs the 
-MultiLayer Personalized Page Rank Algorithm. One can choose to run different experiments with varyin alphas by specifying it in the method call: 
+MultiLayer Personalized PageRank Algorithm. One can choose to run different experiments with varying alphas by specifying it in the method call: 
 
-```alpha (int,optional)```: page rank exploration parameter, defaults to .85  
+```alpha (int,optional)```: PageRank exploration parameter, defaults to .85  
 
 ```python
 eigs = ranker.pageRank(alpha = .85)
@@ -86,7 +82,7 @@ This method returns the leading eigenvector corresponding to each node's rank.
 
 ### Output Formatting
 
-The ```formattedRanks``` method allows you to get the rankings with appropriate node labels in a dictionary format: x
+The ```formattedRanks``` method allows getting the rankings with appropriate node labels in a dictionary format: x
  
 
 ```eigs (ndarray)```: corresponding eigenvector to format 
@@ -95,11 +91,11 @@ The ```formattedRanks``` method allows you to get the rankings with appropriate 
 ranker.formattedRanks(eigs)
 ```
 
-The  ```adjDF``` method allows you to view format a personal or adjacency matrix with corresponding labels as a dataframe: 
+The  ```adjDF``` method allows getting a personal or adjacency matrix with corresponding labels as a dataframe: 
 
 ```matrix (ndarray)``` : an adj matrix or personal matrix to transform
 
-```f (str,optional)```: Optional if you wish to write the df to an output csv
+```f (str,optional)```: Optional, if true, writes the df to an output csv
 
 ```python 
 #for persoanl matrix
