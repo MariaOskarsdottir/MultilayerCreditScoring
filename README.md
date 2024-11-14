@@ -104,6 +104,8 @@ personalDF = ranker.toDf(ranker.personal)
 adjDf = ranker.toDf(ranker.matrix)
 ```
 
+[![mulp Average Daily Downloads](https://assets.piptrends.com/get-average-downloads-badge/mulp.svg 'mulp Average Daily Downloads by pip Trends')](https://piptrends.com/package/mulp)
+
 
 
 
