@@ -10,7 +10,10 @@ setuptools.setup(
     description="Python implementation of the Multilayer Credit Scoring algorithm from Óskarsdóttir & Bravo (2019)",	
     long_description=long_descripiton,
     long_description_content_type="text/markdown",
-    url="https://github.com/BankingAnalyticsLab/mulp",
+    project_urls={
+        'GitHub': 'https://github.com/BankingAnalyticsLab/mulp',
+        'Changelog': 'https://github.com/BankingAnalyticsLab/mulp/blob/master/CHANGELOG.md',
+    },
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.11",
