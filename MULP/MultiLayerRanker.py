@@ -18,15 +18,15 @@ from typing import List
 
 class MultiLayerRanker:
 
-    def __init__(self, layer_files, common_nodes_file, personal_file, biderectional=False, sparse=True):
+    def __init__(self, layer_files, common_nodes_file, personal_file, bidirectional=False, sparse=True):
         """Initializer for Multi Layer Ranker
 
         Args:
-            layer_files (list): list of layer files 
-            common_nodes_file (str): csv file to common nodes 
-            personal_file (str): file to create personal matrix 
-            biderectional (bool, optional): wheter edges are biderectional or not. Defaults to False.
-            sparse (bool, optional): use sparse or desnse matrix. Defaults to True.
+            layer_files (list): list of layer files.
+            common_nodes_file (str): csv file to common nodes. 
+            personal_file (str): file to create personal matrix. 
+            bidirectional (bool, optional): whether edges are bidirectional or not (directed graph). Defaults to False.
+            sparse (bool, optional): use sparse or dense matrix. Defaults to True.
         """
         assert reduce(
             and_, [f[-5:] == '.ncol' for f in layer_files]), "File not in ncol format"
@@ -38,6 +38,7 @@ class MultiLayerRanker:
         self.common_nodes = {}
         self.common = pd.read_csv(common_nodes_file, header=None)
         self.gs = {}
+
         # create independant layers
         for f in self.files:
             g = Graph()
@@ -67,8 +68,10 @@ class MultiLayerRanker:
         else:
             self.adj_matrix = np.zeros((self.N, self.N))
             self.personal = np.zeros((self.N, self.N))
+
         # build adj matrix
-        self.buildAdjMatrix(biderectional)
+        self.buildAdjMatrix(bidirectional)
+        
         # build personal matrix
         self.construct_personal_matrix()
 
@@ -107,8 +110,9 @@ class MultiLayerRanker:
         self.supra = matrix
         _, leading_eigenvectors = eigs(matrix, 1)
 
-        # do we need to be conserned about img (complex numbers!)
+        # do we need to be concerned about img (complex numbers!)
         leading_eigenvector = leading_eigenvectors[:, 0].real
+
         # normalize the eigenvector
         self.leading_eigenvector_norm = leading_eigenvector / leading_eigenvector.sum()
 
@@ -180,7 +184,7 @@ class MultiLayerRanker:
         """Creates adj matrix 
 
         Args:
-            bidirectional (bool): wheter the edges are directed or undirected
+            bidirectional (bool): whether the edges are directed or undirected
         """
         n = 0
 
