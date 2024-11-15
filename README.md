@@ -1,4 +1,4 @@
-# MuLP
+# mulp
 
 This repository/package includes a python script that implements the Multilayer PageRank algorithm presented in [Bravo and Óskarsdóttir (2020)](https://doi.org/10.48550/arXiv.2005.12418) and Óskarsdóttir and Bravo (2021, [ArXiV](https://arxiv.org/abs/2010.09559) , [Publisher](https://doi.org/10.1016/j.omega.2021.102520)).
 

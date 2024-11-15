@@ -4,15 +4,15 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="mulp",
-    version="1.1.0",
-    author="Cristián Bravo",
+    version="1.1.1",
+    author="Cristián Bravo, Sigurjon Thorsteinsson, Emiliano Penaloza, María Óskarsdóttir",
     author_email="cbravoro@uwo.ca",
     description="Python implementation of the Multilayer Credit Scoring algorithm from Óskarsdóttir & Bravo (2019)",	
     long_description=long_descripiton,
     long_description_content_type="text/markdown",
     project_urls={
-        'GitHub': 'https://github.com/BankingAnalyticsLab/mulp',
-        'Changelog': 'https://github.com/BankingAnalyticsLab/mulp/blob/master/CHANGELOG.md',
+        'GitHub': 'https://github.com/Banking-Analytics-Lab/mulp',
+        'Changelog': 'https://github.com/Banking-Analytics-Lab/mulp/blob/master/CHANGELOG.md',
     },
     packages=setuptools.find_packages(),
     classifiers=[
