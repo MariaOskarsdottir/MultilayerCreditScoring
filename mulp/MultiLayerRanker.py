@@ -7,7 +7,7 @@ from functools import reduce
 import pandas as pd
 from operator import and_
 from scipy.sparse.linalg import eigs
-from scipy.sparse import  issparse
+from scipy.sparse import  issparse, lil_matrix
 from sklearn.preprocessing import normalize
 from collections import defaultdict
 import time
@@ -227,11 +227,15 @@ class MultiLayerRanker:
             for graph in self.gs:
                 ind = self.gs[graph].vs.find(f'{r[0]}').index
                 start = self.startingInd[graph]
-                _, cs = self.adj_matrix[start + ind, :].nonzero()
+                if not self.sparse:
+                    cs = self.adj_matrix[start + ind, :].nonzero()[0]
+                else:    
+                    _, cs = self.adj_matrix[start + ind, :].nonzero()
                 self.personal[ind + start, start + ind] = 1
                 for i in cs:
                     g = self.getGraph(i)
                     g2 = self.getGraph(start + ind)
                     if g != g2:
                         self.personal[ind + start, i] = 1
+
 
