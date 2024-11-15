@@ -4,13 +4,13 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="mulp",
-    version="1.1",
+    version="1.1.0",
     author="Cristián Bravo",
     author_email="cbravoro@uwo.ca",
     description="Python implementation of the Multilayer Credit Scoring algorithm from Óskarsdóttir & Bravo (2019)",	
     long_description=long_descripiton,
     long_description_content_type="text/markdown",
-    url="https://github.com/BankingAnalyticsLab/MuLP",
+    url="https://github.com/BankingAnalyticsLab/mulp",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.11",
@@ -24,5 +24,6 @@ setuptools.setup(
         "scipy>=1.14.1",
         "scikit-learn>=1.5.2" ,
         "pandas>=2.2.3",
+        "igraph>=0.11.2",
     ]
 )
